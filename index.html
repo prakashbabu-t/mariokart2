@@ -109,29 +109,37 @@
     window.addEventListener("keydown", (e) => keys[e.code] = true);
     window.addEventListener("keyup", (e) => keys[e.code] = false);
 
-    function updateKart(kart) {
-      if (kart.finished) return;
+function updateKart(kart) {
+  if (kart.finished) return;
 
-      if (keys[kart.controls.up]) kart.speed += kart.accel;
-      else if (keys[kart.controls.down]) kart.speed -= kart.accel;
-      else {
-        if (kart.speed > 0) kart.speed -= kart.friction;
-        else if (kart.speed < 0) kart.speed += kart.friction;
-      }
+  // ACCELERATION
+  if (keys[kart.controls.up]) {
+    kart.speed += kart.accel;
+  } else {
+    kart.speed -= kart.friction; // natural slowdown
+  }
 
-      kart.speed = Math.max(Math.min(kart.speed, kart.maxSpeed), -kart.maxSpeed / 2);
+  // BRAKE / REVERSE
+  if (keys[kart.controls.down]) {
+    kart.speed -= kart.accel * 1.2;
+  }
 
-      if (kart.speed !== 0) {
-        if (keys[kart.controls.left]) kart.angle -= kart.turnSpeed * (kart.speed / kart.maxSpeed);
-        if (keys[kart.controls.right]) kart.angle += kart.turnSpeed * (kart.speed / kart.maxSpeed);
-      }
+  // CLAMP SPEED
+  kart.speed = Math.max(Math.min(kart.speed, kart.maxSpeed), -kart.maxSpeed * 0.4);
 
-      kart.x += Math.cos(kart.angle) * kart.speed;
-      kart.y += Math.sin(kart.angle) * kart.speed;
+  // TURNING — stronger, but speed‑dependent
+  let turnFactor = Math.min(Math.abs(kart.speed) / kart.maxSpeed, 1);
+  if (keys[kart.controls.left]) kart.angle -= kart.turnSpeed * turnFactor * 1.4;
+  if (keys[kart.controls.right]) kart.angle += kart.turnSpeed * turnFactor * 1.4;
 
-      keepOnTrack(kart);
-      handleLap(kart);
-    }
+  // MOVEMENT — more stable, less sliding
+  kart.x += Math.cos(kart.angle) * kart.speed;
+  kart.y += Math.sin(kart.angle) * kart.speed;
+
+  keepOnTrack(kart);
+  handleLap(kart);
+}
+
 
     function keepOnTrack(kart) {
       const o = track.outer;
