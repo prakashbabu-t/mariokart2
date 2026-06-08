@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mini 2-Kart Racer</title>
+  <style>
+    body {
+      margin: 0;
+      background: #222;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #fff;
+      font-family: sans-serif;
+    }
+    #gameContainer {
+      position: relative;
+    }
+    canvas {
+      background: #2b5d2b;
+      border: 4px solid #fff;
+      display: block;
+    }
+    #hud {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      right: 8px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      text-shadow: 1px 1px 2px #000;
+    }
+    #winner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 32px;
+      font-weight: bold;
+      text-shadow: 2px 2px 4px #000;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="gameContainer">
+    <canvas id="game" width="800" height="600"></canvas>
+    <div id="hud">
+      <div id="p1Info"></div>
+      <div id="p2Info"></div>
+    </div>
+    <div id="winner"></div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const p1Info = document.getElementById("p1Info");
+    const p2Info = document.getElementById("p2Info");
+    const winnerEl = document.getElementById("winner");
+
+    const TRACK_LAPS_TO_WIN = 3;
+
+    const track = {
+      outer: { x: 50, y: 50, w: 700, h: 500 },
+      inner: { x: 200, y: 150, w: 400, h: 300 },
+      startLineX: 400,
+      startLineY1: 150,
+      startLineY2: 450
+    };
+
+    function createKart(x, y, color, controls) {
+      return {
+        x,
+        y,
+        angle: -Math.PI / 2,
+        speed: 0,
+        maxSpeed: 4,
+        accel: 0.15,
+        friction: 0.05,
+        turnSpeed: 0.05,
+        w: 30,
+        h: 18,
+        color,
+        controls,
+        laps: 0,
+        lastLapYSide: null,
+        finished: false
+      };
+    }
+
+    const kart1 = createKart(380, 420, "red", {
+      up: "KeyW",
+      down: "KeyS",
+      left: "KeyA",
+      right: "KeyD"
+    });
+
+    const kart2 = createKart(420, 420, "blue", {
+      up: "ArrowUp",
+      down: "ArrowDown",
+      left: "ArrowLeft",
+      right: "ArrowRight"
+    });
+
+    const keys = {};
+    window.addEventListener("keydown", (e) => keys[e.code] = true);
+    window.addEventListener("keyup", (e) => keys[e.code] = false);
+
+    function updateKart(kart) {
+      if (kart.finished) return;
+
+      if (keys[kart.controls.up]) kart.speed += kart.accel;
+      else if (keys[kart.controls.down]) kart.speed -= kart.accel;
+      else {
+        if (kart.speed > 0) kart.speed -= kart.friction;
+        else if (kart.speed < 0) kart.speed += kart.friction;
+      }
+
+      kart.speed = Math.max(Math.min(kart.speed, kart.maxSpeed), -kart.maxSpeed / 2);
+
+      if (kart.speed !== 0) {
+        if (keys[kart.controls.left]) kart.angle -= kart.turnSpeed * (kart.speed / kart.maxSpeed);
+        if (keys[kart.controls.right]) kart.angle += kart.turnSpeed * (kart.speed / kart.maxSpeed);
+      }
+
+      kart.x += Math.cos(kart.angle) * kart.speed;
+      kart.y += Math.sin(kart.angle) * kart.speed;
+
+      keepOnTrack(kart);
+      handleLap(kart);
+    }
+
+    function keepOnTrack(kart) {
+      const o = track.outer;
+      if (kart.x < o.x) kart.x = o.x;
+      if (kart.x > o.x + o.w) kart.x = o.x + o.w;
+      if (kart.y < o.y) kart.y = o.y;
+      if (kart.y > o.y + o.h) kart.y = o.y + o.h;
+
+      const i = track.inner;
+      if (kart.x > i.x && kart.x < i.x + i.w && kart.y > i.y && kart.y < i.y + i.h) {
+        kart.x -= Math.cos(kart.angle) * 2;
+        kart.y -= Math.sin(kart.angle) * 2;
+        kart.speed *= 0.7;
+      }
+    }
+
+    function handleLap(kart) {
+      const prevSide = kart.lastLapYSide;
+      const midY = (track.startLineY1 + track.startLineY2) / 2;
+      const currentSide = kart.y < midY ? "top" : "bottom";
+
+      if (prevSide === "bottom" && currentSide === "top") {
+        kart.laps++;
+        if (kart.laps >= TRACK_LAPS_TO_WIN) {
+          kart.finished = true;
+          winnerEl.style.display = "block";
+          winnerEl.textContent = `${kart.color.toUpperCase()} KART WINS!`;
+        }
+      }
+
+      kart.lastLapYSide = currentSide;
+    }
+
+    function drawTrack() {
+      const o = track.outer;
+      const i = track.inner;
+
+      ctx.fillStyle = "#555";
+      ctx.fillRect(o.x, o.y, o.w, o.h);
+
+      ctx.fillStyle = "#2b5d2b";
+      ctx.fillRect(i.x, i.y, i.w, i.h);
+
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(track.startLineX, track.startLineY1);
+      ctx.lineTo(track.startLineX, track.startLineY2);
+      ctx.stroke();
+    }
+
+    function drawKart(kart) {
+      ctx.save();
+      ctx.translate(kart.x, kart.y);
+      ctx.rotate(kart.angle);
+      ctx.fillStyle = kart.color;
+      ctx.fillRect(-kart.w / 2, -kart.h / 2, kart.w, kart.h);
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(kart.w / 4, -kart.h / 4, kart.w / 4, kart.h / 2);
+      ctx.restore();
+    }
+
+    function drawHUD() {
+      p1Info.textContent = `Red (WASD) - Laps: ${kart1.laps}/3`;
+      p2Info.textContent = `Blue (Arrows) - Laps: ${kart2.laps}/3`;
+    }
+
+    function loop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawTrack();
+      updateKart(kart1);
+      updateKart(kart2);
+      drawKart(kart1);
+      drawKart(kart2);
+      drawHUD();
+      requestAnimationFrame(loop);
+    }
+
+    loop();
+  </script>
+</body>
+</html>
